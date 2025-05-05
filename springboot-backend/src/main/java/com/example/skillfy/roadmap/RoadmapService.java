@@ -125,4 +125,15 @@ public class RoadmapService {
     public boolean isUserEnrolled(String userId, String roadmapId) {
         return enrollmentRepository.existsByUserIdAndRoadmapId(userId, new ObjectId(roadmapId));
     }
+
+    public void deleteCommentsByUserId(String userId) {
+        List<Roadmap> roadmaps = roadmapRepository.findAll();
+
+        for (Roadmap roadmap : roadmaps) {
+            boolean changed = roadmap.getComments().removeIf(comment -> comment.getAuthorId().equals(userId));
+            if (changed) {
+                roadmapRepository.save(roadmap);
+            }
+        }
+    }
 }

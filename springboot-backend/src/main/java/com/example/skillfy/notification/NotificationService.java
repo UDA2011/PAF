@@ -1,9 +1,8 @@
 package com.example.skillfy.notification;
 
+import com.example.skillfy.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
-import com.example.skillfy.exception.ResourceNotFoundException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -50,5 +49,9 @@ public class NotificationService {
         List<Notification> notifications = notificationRepository.findByAuthorIdAndNotificationReadFalse(userId);
         notifications.forEach(notification -> notification.setNotificationRead(true));
         notificationRepository.saveAll(notifications);
+    }
+
+    public void deleteAllNotificationsByUser(String userId) {
+        notificationRepository.deleteByAuthorId(userId);
     }
 }

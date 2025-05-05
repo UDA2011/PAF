@@ -113,4 +113,16 @@ public class MilestonePostService {
         }
         return milestonePostRepository.save(post);
     }
+
+    public void deleteAllCommentsByUserId(String userId) {
+        // Find all posts where comments exist
+        List<MilestonePost> posts = milestonePostRepository.findAll();
+
+        for (MilestonePost post : posts) {
+            boolean changed = post.getComments().removeIf(comment -> comment.getAuthorId().equals(userId));
+            if (changed) {
+                milestonePostRepository.save(post);
+            }
+        }
+    }
 }

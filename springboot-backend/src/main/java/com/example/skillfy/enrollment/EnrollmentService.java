@@ -77,8 +77,16 @@ public class EnrollmentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Enrollment not found for user: " + userId + " and roadmap: " + roadmapId));
     }
 
-    public void deleteEnrollmentsByRoadmapId(String roadmapId){
+    public void deleteEnrollmentsByRoadmapId(String roadmapId) {
         ObjectId roadmapObjectId = new ObjectId(roadmapId);
         enrollmentRepository.deleteByRoadmapId(roadmapObjectId);
+    }
+
+    public void deleteAllEnrollmentsByUserId(String userId) {
+        List<Enrollment> enrollments = enrollmentRepository.findByUserId(userId);
+
+        for (Enrollment enrollment : enrollments) {
+            enrollmentRepository.deleteById(enrollment.getId());
+        }
     }
 }

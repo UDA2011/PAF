@@ -1,14 +1,21 @@
 package com.example.skillfy.user;
 
-import lombok.RequiredArgsConstructor;
-import org.bson.types.ObjectId;
-import org.springframework.stereotype.Service;
-
+import com.example.skillfy.enrollment.EnrollmentService;
 import com.example.skillfy.exception.ResourceNotFoundException;
+import com.example.skillfy.milestonepost.MilestonePost;
+import com.example.skillfy.milestonepost.MilestonePostService;
 import com.example.skillfy.notification.NotificationDto;
 import com.example.skillfy.notification.NotificationMapper;
 import com.example.skillfy.notification.NotificationService;
 import com.example.skillfy.notification.NotificationType;
+import com.example.skillfy.roadmap.Roadmap;
+import com.example.skillfy.roadmap.RoadmapService;
+import com.example.skillfy.skillpost.SkillPost;
+import com.example.skillfy.skillpost.SkillPostService;
+import lombok.RequiredArgsConstructor;
+import org.bson.types.ObjectId;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -21,6 +28,10 @@ public class UserService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final NotificationMapper notificationMapper;
+    private final MilestonePostService milestonePostService;
+    private final EnrollmentService enrollmentService;
+    private final RoadmapService roadmapService;
+    private final SkillPostService skillPostService;
 
 
     public void createOrUpdateUserFromOAuth(String googleId, String email, String name, String profileImageUrl) {
@@ -67,8 +78,86 @@ public class UserService {
         this.userRepository.deleteById(user.getId().toString());
     }
 
-    public void deleteById(String id) {
-        this.userRepository.deleteById(id);
+    @Transactional
+    public boolean deleteUserById(String userId) {
+        User userToDelete = findById(userId);
+        if (userToDelete == null) {
+            return false;
+        }
+
+        ObjectId userObjectId = userToDelete.getId();
+        String userIdStr = userObjectId.toString();
+
+        // Delete all milestone posts created by the user
+        List<MilestonePost> userMilestonePosts = milestonePostService.findByUserId(userIdStr);
+        for (MilestonePost post : userMilestonePosts) {
+            milestonePostService.delete(post.getMilestonePostId().toHexString());
+        }
+
+        // Remove user's likes from other milestone posts
+        List<MilestonePost> likedMilestonePosts = milestonePostService.findLikedByUser(userIdStr);
+        for (MilestonePost post : likedMilestonePosts) {
+            milestonePostService.removeLike(post.getMilestonePostId().toHexString(), userIdStr);
+        }
+
+        //  Delete user's comments from other milestone posts
+        milestonePostService.deleteAllCommentsByUserId(userIdStr);
+
+
+        // Delete all user enrollments
+        enrollmentService.deleteAllEnrollmentsByUserId(userIdStr);
+
+
+        // Delete all roadmaps created by the user
+        List<Roadmap> userRoadmaps = roadmapService.getRoadmapsByAuthor(userIdStr);
+        for (Roadmap roadmap : userRoadmaps) {
+            roadmapService.deleteRoadmap(roadmap.getId().toHexString());
+        }
+
+        // Remove user's likes from other roadmaps
+        List<Roadmap> likedRoadmaps = roadmapService.getLikedRoadmaps(userIdStr);
+        for (Roadmap roadmap : likedRoadmaps) {
+            roadmapService.removeLike(roadmap.getId().toHexString(), userIdStr);
+        }
+
+        // Delete user's comments from other roadmaps
+        roadmapService.deleteCommentsByUserId(userIdStr);
+
+
+        // Delete all skill posts created by the user
+        List<SkillPost> skillPosts = skillPostService.findLikedByUser(userIdStr);
+        for (SkillPost skillPost : skillPosts) {
+            skillPostService.delete(skillPost.getSkillPostId().toHexString());
+        }
+
+        // Remove user's likes from other skill posts
+        List<SkillPost> likedSkillPosts = skillPostService.findLikedByUser(userIdStr);
+        for (SkillPost skillPost : likedSkillPosts) {
+            skillPostService.removeLike(skillPost.getSkillPostId().toHexString(), userIdStr);
+        }
+
+        // Delete user's comments from other skill posts
+        skillPostService.deleteAllCommentsByUserId(userIdStr);
+
+
+        // Remove user from others' followers/following lists
+        List<User> followers = getUserFollowers(userIdStr);
+        for (User follower : followers) {
+            unfollowUser(follower.getId().toString(), userIdStr);
+        }
+
+        List<User> following = getUserFollowing(userIdStr);
+        for (User followed : following) {
+            unfollowUser(userIdStr, followed.getId().toString());
+        }
+
+        // Delete notifications related to this user
+        notificationService.deleteAllNotificationsByUser(userIdStr);
+
+        //Delete the user
+        userRepository.deleteById(userIdStr);
+
+        return true;
     }
 
     public User findById(String id) {
